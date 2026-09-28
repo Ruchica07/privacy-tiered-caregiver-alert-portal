@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import DisclaimerStrip from './components/DisclaimerStrip';
 import RoleSelector from './components/RoleSelector';
 import Dashboard from './components/Dashboard';
+import FleetDashboard from './components/FleetDashboard';
 import Onboarding from './components/Onboarding';
 import AdminAudit from './components/AdminAudit';
 import MetricsDashboard from './components/MetricsDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
-import { LayoutDashboard, Shield, History, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, History, BarChart2 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -87,44 +88,7 @@ export default function App() {
         }
       })
       .catch(() => {
-        // Fallback mock alerts
-        setAlerts([
-          {
-            alert_id: 'a_001',
-            care_recipient_id: selectedRecipientId,
-            rule_fired: 'nocturnal_wandering',
-            summary: 'Nocturnal Activity Outside Baseline',
-            category: 'location_safety',
-            severity: 'high',
-            rendered_tier: 2,
-            generated_at: new Date().toISOString(),
-            evidence_summary: 'Nocturnal movement detected between 02:15 and 03:45 AM (3 occurrences this week, baseline = 0).',
-            actionable_step: 'Check front door smart lock status or call Dorothy during morning check-in.',
-            evidence_data: {
-              trend_points: [
-                { day: 'Mon', count: 0 },
-                { day: 'Tue', count: 0 },
-                { day: 'Wed', count: 1 },
-                { day: 'Thu', count: 0 },
-                { day: 'Fri', count: 3 },
-                { day: 'Sat', count: 2 },
-                { day: 'Sun', count: 4 },
-              ]
-            }
-          },
-          {
-            alert_id: 'a_002',
-            care_recipient_id: selectedRecipientId,
-            rule_fired: 'missed_checkin',
-            summary: 'Morning Check-In Delay',
-            category: 'activity_engagement',
-            severity: 'medium',
-            rendered_tier: 1,
-            generated_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-            evidence_summary: 'Morning check-in button has not been pressed for 4.5 hours past the expected 9:00 AM window.',
-            actionable_step: 'Send a routine text check-in or place a casual phone call.'
-          }
-        ]);
+        setAlerts([]);
       })
       .finally(() => setLoading(false));
 
@@ -148,14 +112,7 @@ export default function App() {
           setAccessSummary(combined);
         }
       })
-      .catch(() => {
-        setAccessSummary([
-          { category: 'activity_engagement', consented_tier: 1, is_active: true },
-          { category: 'location_safety', consented_tier: 2, is_active: true },
-          { category: 'vitals_summary', consented_tier: 0, is_active: true },
-          { category: 'social_isolation_signal', consented_tier: 1, is_active: true },
-        ]);
-      });
+      .catch(() => {});
 
     // Fetch full consent matrix
     fetch(`${API_BASE}/api/consent/${selectedRecipientId}`)
@@ -174,26 +131,7 @@ export default function App() {
         const list = Array.isArray(data) ? data : (data?.audit_log || []);
         setAuditLogs(list);
       })
-      .catch(() => {
-        setAuditLogs([
-          {
-            audit_id: 'aud_001',
-            timestamp: new Date().toISOString(),
-            event_type: 'alert_filtered',
-            actor_id: selectedCaregiverId,
-            care_recipient_id: selectedRecipientId,
-            details: { decision: 'rendered', category: 'location_safety', tier: 2 }
-          },
-          {
-            audit_id: 'aud_002',
-            timestamp: new Date(Date.now() - 7200000).toISOString(),
-            event_type: 'consent_change',
-            actor_id: 'system_proxy',
-            care_recipient_id: selectedRecipientId,
-            details: { category: 'location_safety', new_tier: 2, status: 'granted' }
-          }
-        ]);
-      });
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -276,6 +214,26 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => setActiveTab('fleet')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'fleet' ? '3px solid #818cf8' : '3px solid transparent',
+                color: activeTab === 'fleet' ? '#818cf8' : '#94a3b8',
+                padding: '0.85rem 0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              <Users size={16} />
+              <span>Coordinator Fleet Grid</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('onboarding')}
               style={{
                 background: 'transparent',
@@ -312,7 +270,7 @@ export default function App() {
               }}
             >
               <History size={16} />
-              <span>Audit Trail Log</span>
+              <span>Tamper-Evident Audit Trail</span>
             </button>
 
             <button
@@ -335,7 +293,7 @@ export default function App() {
               }}
             >
               <BarChart2 size={16} />
-              <span>Evaluation Metrics</span>
+              <span>Academic Evaluation</span>
             </button>
           </div>
         </div>
@@ -350,6 +308,13 @@ export default function App() {
                 caregiverRole={currentCaregiver.role}
                 onRefresh={handleRefreshRules}
                 loading={loading}
+              />
+            )}
+
+            {activeTab === 'fleet' && (
+              <FleetDashboard
+                onSelectRecipient={(rid) => setSelectedRecipientId(rid)}
+                onSwitchToFeed={() => setActiveTab('dashboard')}
               />
             )}
 

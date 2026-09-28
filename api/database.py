@@ -184,6 +184,8 @@ class AuditEntryModel(Base):
     actor_id = Column(String(64), nullable=False)
     care_recipient_id = Column(String(64), index=True, nullable=False)
     details_json = Column(Text, default="{}")
+    prev_hash = Column(String(64), default="0" * 64, nullable=False)
+    entry_hash = Column(String(64), default="", nullable=False)
 
     def to_dict(self) -> dict:
         try:
@@ -197,6 +199,8 @@ class AuditEntryModel(Base):
             "actor_id": self.actor_id,
             "care_recipient_id": self.care_recipient_id,
             "details": det,
+            "prev_hash": self.prev_hash,
+            "entry_hash": self.entry_hash,
         }
 
 
@@ -204,11 +208,37 @@ class AuditEntryModel(Base):
 # Database Initialization & Seeding
 # ---------------------------------------------------------------------------
 
+def _migrate_audit_log_columns():
+    """
+    Add prev_hash and entry_hash columns to audit_log if they are missing
+    (handles databases created before Phase 2 schema was introduced).
+    """
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            # Check existing columns
+            result = conn.execute(text("PRAGMA table_info(audit_log)"))
+            cols = {row[1] for row in result}
+            if "prev_hash" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE audit_log ADD COLUMN prev_hash VARCHAR(64) NOT NULL DEFAULT '" + "0" * 64 + "'"
+                ))
+                conn.commit()
+            if "entry_hash" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE audit_log ADD COLUMN entry_hash VARCHAR(64) NOT NULL DEFAULT ''"
+                ))
+                conn.commit()
+    except Exception:
+        pass  # Table may not exist yet; create_all will handle it
+
+
 def init_db(dataset_path: Optional[str] = None):
     """
     Creates SQLite tables and seeds them from dataset JSON if empty.
     """
     Base.metadata.create_all(bind=engine)
+    _migrate_audit_log_columns()
 
     session = SessionLocal()
     try:

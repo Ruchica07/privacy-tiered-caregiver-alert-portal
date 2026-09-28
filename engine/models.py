@@ -178,15 +178,49 @@ class ConsentRecord:
         return True
 
 
+import hashlib
+import json
+
+GENESIS_HASH = "0" * 64
+
+def compute_audit_hash(
+    audit_id: str,
+    timestamp: str,
+    event_type: str,
+    actor_id: str,
+    care_recipient_id: str,
+    details: dict,
+    prev_hash: str = GENESIS_HASH,
+) -> str:
+    """Compute deterministic SHA-256 hash for an audit log entry."""
+    canonical_details = json.dumps(details, sort_keys=True, default=str)
+    payload = f"{audit_id}|{timestamp}|{event_type}|{actor_id}|{care_recipient_id}|{canonical_details}|{prev_hash}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 @dataclass
 class AuditEntry:
-    """An immutable audit log entry for consent or alert events."""
+    """An immutable, tamper-evident hash-chained audit log entry."""
     audit_id: str
     timestamp: str          # ISO datetime
-    event_type: str         # "consent_change", "alert_generated", "alert_filtered", "consent_expired"
+    event_type: str         # "consent_change", "alert_generated", "alert_filtered", "consent_expired", "webhook_ingest"
     actor_id: str           # Who initiated the change
     care_recipient_id: str
     details: dict = field(default_factory=dict)
+    prev_hash: str = GENESIS_HASH
+    entry_hash: Optional[str] = None
+
+    def __post_init__(self):
+        if not self.entry_hash:
+            self.entry_hash = compute_audit_hash(
+                self.audit_id,
+                self.timestamp,
+                self.event_type,
+                self.actor_id,
+                self.care_recipient_id,
+                self.details,
+                self.prev_hash,
+            )
 
     def to_dict(self):
         return {
@@ -196,6 +230,8 @@ class AuditEntry:
             "actor_id": self.actor_id,
             "care_recipient_id": self.care_recipient_id,
             "details": self.details,
+            "prev_hash": self.prev_hash,
+            "entry_hash": self.entry_hash,
         }
 
 

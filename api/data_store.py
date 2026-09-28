@@ -16,7 +16,7 @@ from api.database import (
     CareRecipientModel, CaregiverModel, ConsentRecordModel,
     SignalModel, AlertModel, AuditEntryModel
 )
-from engine.models import generate_id
+from engine.models import generate_id, compute_audit_hash, GENESIS_HASH
 
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
@@ -177,6 +177,21 @@ class DataStore:
                         },
                     }
 
+                last_entry = session.query(AuditEntryModel).order_by(AuditEntryModel.timestamp.desc(), AuditEntryModel.audit_id.desc()).first()
+                prev_hash = last_entry.entry_hash if last_entry and last_entry.entry_hash else GENESIS_HASH
+
+                entry_hash = compute_audit_hash(
+                    audit_id=audit_entry["audit_id"],
+                    timestamp=audit_entry["timestamp"],
+                    event_type=audit_entry["event_type"],
+                    actor_id=audit_entry["actor_id"],
+                    care_recipient_id=audit_entry["care_recipient_id"],
+                    details=audit_entry["details"],
+                    prev_hash=prev_hash,
+                )
+                audit_entry["prev_hash"] = prev_hash
+                audit_entry["entry_hash"] = entry_hash
+
                 audit_entries.append(audit_entry)
                 # Also save audit log to DB
                 audit_obj = AuditEntryModel(
@@ -186,8 +201,11 @@ class DataStore:
                     actor_id=audit_entry["actor_id"],
                     care_recipient_id=audit_entry["care_recipient_id"],
                     details_json=json.dumps(audit_entry["details"]),
+                    prev_hash=prev_hash,
+                    entry_hash=entry_hash,
                 )
                 session.add(audit_obj)
+                session.flush()
 
             session.commit()
             return audit_entries
@@ -304,22 +322,124 @@ class DataStore:
         finally:
             session.close()
 
-    def add_audit_entry(self, entry: dict):
+    def add_audit_entry(self, entry: dict) -> dict:
+        """Add a new audit entry with cryptographic hash chaining."""
         session = SessionLocal()
         try:
+            audit_id = entry.get("audit_id", generate_id())
+            timestamp = entry.get("timestamp", datetime.utcnow().isoformat() + "Z")
+            event_type = entry.get("event_type", "audit_event")
+            actor_id = entry.get("actor_id", "system")
+            care_recipient_id = entry.get("care_recipient_id", "")
+            details = entry.get("details", {})
+
+            # Retrieve the latest entry to link the hash chain
+            last_entry = session.query(AuditEntryModel).order_by(AuditEntryModel.timestamp.desc(), AuditEntryModel.audit_id.desc()).first()
+            prev_hash = last_entry.entry_hash if last_entry and last_entry.entry_hash else GENESIS_HASH
+
+            entry_hash = compute_audit_hash(
+                audit_id=audit_id,
+                timestamp=timestamp,
+                event_type=event_type,
+                actor_id=actor_id,
+                care_recipient_id=care_recipient_id,
+                details=details,
+                prev_hash=prev_hash,
+            )
+
             obj = AuditEntryModel(
-                audit_id=entry.get("audit_id", generate_id()),
-                timestamp=entry.get("timestamp", datetime.utcnow().isoformat() + "Z"),
-                event_type=entry.get("event_type", "audit_event"),
-                actor_id=entry.get("actor_id", "system"),
-                care_recipient_id=entry.get("care_recipient_id", ""),
-                details_json=json.dumps(entry.get("details", {})),
+                audit_id=audit_id,
+                timestamp=timestamp,
+                event_type=event_type,
+                actor_id=actor_id,
+                care_recipient_id=care_recipient_id,
+                details_json=json.dumps(details),
+                prev_hash=prev_hash,
+                entry_hash=entry_hash,
             )
             session.add(obj)
             session.commit()
+            return obj.to_dict()
         except Exception:
             session.rollback()
             raise
+        finally:
+            session.close()
+
+    def verify_audit_chain(self, care_recipient_id: Optional[str] = None) -> dict:
+        """
+        Cryptographically verify the integrity of the audit hash chain.
+        Ensures prev_hash correctly references previous entry_hash and entry_hash matches data.
+        """
+        session = SessionLocal()
+        try:
+            query = session.query(AuditEntryModel)
+            if care_recipient_id:
+                query = query.filter(AuditEntryModel.care_recipient_id == care_recipient_id)
+            entries = query.all()
+
+            # Sort chronologically to verify forward hash chain
+            sorted_entries = sorted(entries, key=lambda e: (e.timestamp, e.audit_id))
+
+            if not sorted_entries:
+                return {
+                    "is_valid": True,
+                    "total_records": 0,
+                    "verified_at": datetime.utcnow().isoformat() + "Z",
+                    "root_hash": GENESIS_HASH,
+                    "tip_hash": GENESIS_HASH,
+                    "status": "empty_chain",
+                }
+
+            prev_expected_hash = GENESIS_HASH
+            for idx, entry in enumerate(sorted_entries):
+                # Verify prev_hash matches
+                if idx == 0 and not entry.prev_hash:
+                    pass  # Genesis record
+                elif entry.prev_hash != prev_expected_hash:
+                    return {
+                        "is_valid": False,
+                        "tampered_index": idx,
+                        "tampered_audit_id": entry.audit_id,
+                        "reason": f"Broken hash chain link: prev_hash ({entry.prev_hash[:16]}...) does not match expected ({prev_expected_hash[:16]}...)",
+                        "verified_at": datetime.utcnow().isoformat() + "Z",
+                    }
+
+                # Verify entry_hash recomputation
+                try:
+                    det = json.loads(entry.details_json)
+                except Exception:
+                    det = {}
+
+                computed = compute_audit_hash(
+                    audit_id=entry.audit_id,
+                    timestamp=entry.timestamp,
+                    event_type=entry.event_type,
+                    actor_id=entry.actor_id,
+                    care_recipient_id=entry.care_recipient_id,
+                    details=det,
+                    prev_hash=entry.prev_hash,
+                )
+
+                if entry.entry_hash != computed:
+                    return {
+                        "is_valid": False,
+                        "tampered_index": idx,
+                        "tampered_audit_id": entry.audit_id,
+                        "reason": f"Data tampering detected: entry_hash ({entry.entry_hash[:16]}...) does not match computed hash ({computed[:16]}...)",
+                        "verified_at": datetime.utcnow().isoformat() + "Z",
+                    }
+
+                prev_expected_hash = entry.entry_hash
+
+            return {
+                "is_valid": True,
+                "total_records": len(sorted_entries),
+                "verified_at": datetime.utcnow().isoformat() + "Z",
+                "root_hash": sorted_entries[0].prev_hash,
+                "tip_hash": sorted_entries[-1].entry_hash,
+                "status": "valid_tamper_evident",
+            }
         finally:
             session.close()
 
