@@ -1,6 +1,6 @@
 # AegisCare — Advanced Composite Failure Evaluation Report (Phase 3)
 
-**Evaluation Timestamp:** 2026-09-29T10:48:19.417655  
+**Evaluation Timestamp:** 2026-09-29T11:27:35.206691  
 **Total Scenarios Evaluated:** 8  
 **Scenarios Passed:** 8/8 (100.0%)  
 
@@ -12,7 +12,7 @@
 | **SCENARIO-2** | Out-of-Order + Stale Telemetry | Newer telemetry arrives first; older packet arrives out-of-order. | Both signals ingested; timestamps preserved for historical sequence sorting. | **PASS** |
 | **SCENARIO-3** | Missing Required Field + Malformed Payload | Payload with missing recipient identifier followed by unsupported signal type. | Payload 1 errors: ["Missing required field: 'care_recipient_id' (or 'recipient_id'/'patient_id')"]; Payload 2 status: rejected_invalid_payload. | **PASS** |
 | **SCENARIO-4** | Sensor Drift + High-Frequency Noise | Single-sample spike (+40 units) followed by persistent baseline shift (>15%). | Noise spike smoothed to 64.0; Drift detected: True. | **PASS** |
-| **SCENARIO-5** | Network Interruption + Packet Burst (Data Storm) | 100 telemetry packets delivered in a single rapid burst. | Processed 100/100 events in 7.3ms. | **PASS** |
+| **SCENARIO-5** | Network Interruption + Packet Burst (Data Storm) | 100 telemetry packets delivered in a single rapid burst. | Processed 100/100 events in 5.6ms. | **PASS** |
 | **SCENARIO-6** | Multiple Simultaneous Anomalies | Simultaneous missed check-in and device heartbeat gap. | Generated 6 distinct alerts; all strictly passed non-medical linter. | **PASS** |
 | **SCENARIO-7** | Consent Restriction + Alert Generation | High-severity medication alert dispatched to Neighbor caregiver with Tier 0 (withheld) consent. | Status: withheld_consent; Disclosed tier: 0. | **PASS** |
 | **SCENARIO-8** | Sensor Data Gap + Subsequent Recovery | 8-hour missing heartbeat generates system alert; fresh heartbeat arrives 5 minutes ago. | Gap fired: True; Recovery cleared alert: True. | **PASS** |
@@ -45,7 +45,7 @@
 
 ### SCENARIO-5: Network Interruption + Packet Burst (Data Storm)
 - **Expected Behavior:** All 100 packets normalized, deduplicated, and processed without dropping data.
-- **Actual Behavior:** Processed 100/100 events in 7.3ms.
+- **Actual Behavior:** Processed 100/100 events in 5.6ms.
 - **Safety/Privacy Guarantee:** System remains responsive under packet backlog recovery.
 - **Verification Status:** `PASS`
 

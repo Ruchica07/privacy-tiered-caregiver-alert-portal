@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-29T10:48:19.417655",
+  "timestamp": "2026-09-29T11:27:35.206691",
   "total_scenarios": 8,
   "scenarios_passed": 8,
   "scenarios_failed": 0,
@@ -46,7 +46,7 @@
       "name": "Network Interruption + Packet Burst (Data Storm)",
       "input_conditions": "100 telemetry packets delivered in a single rapid burst.",
       "expected_behavior": "All 100 packets normalized, deduplicated, and processed without dropping data.",
-      "actual_behavior": "Processed 100/100 events in 7.3ms.",
+      "actual_behavior": "Processed 100/100 events in 5.6ms.",
       "status": "PASS",
       "privacy_safety_guarantee": "System remains responsive under packet backlog recovery."
     },

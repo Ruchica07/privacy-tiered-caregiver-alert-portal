@@ -2,17 +2,17 @@
 
 > **Disclaimer:** Synthetic local benchmark; not production capacity validation.
 
-**Benchmark Date:** 2026-09-29T10:31:31.861639Z  
+**Benchmark Date:** 2026-09-29T11:27:53.306814Z  
 **Platform:** win32 (Python 3.12.10)  
 
 ## Load Tier Performance Summary
 
 | Event Volume | Duration (s) | Throughput (evt/s) | Avg Latency (ms) | P95 Latency (ms) | Success | Errors | Mem Δ (MB) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **100** | 0.013s | **7,596.6** | 0.114ms | 0.172ms | 100 | 0 | +0.00MB |
-| **500** | 0.194s | **2,583.3** | 0.358ms | 0.794ms | 500 | 0 | +0.00MB |
-| **1,000** | 0.797s | **1,254.7** | 0.753ms | 1.615ms | 1000 | 0 | +0.00MB |
-| **5,000** | 14.266s | **350.5** | 2.798ms | 6.497ms | 5000 | 0 | +0.00MB |
+| **100** | 0.007s | **13,925.2** | 0.062ms | 0.086ms | 100 | 0 | +0.00MB |
+| **500** | 0.062s | **8,000.6** | 0.116ms | 0.182ms | 500 | 0 | +0.00MB |
+| **1,000** | 0.233s | **4,297.9** | 0.223ms | 0.524ms | 1000 | 0 | +0.00MB |
+| **5,000** | 5.580s | **896.0** | 1.099ms | 2.225ms | 5000 | 0 | +0.00MB |
 
 ## Observations
 
