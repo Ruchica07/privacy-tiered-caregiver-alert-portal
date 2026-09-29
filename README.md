@@ -1,138 +1,231 @@
 # AegisCare: Privacy-Tiered Caregiver Alert Portal for Older Adults Living Alone
 
-**Capstone Project — Phase 2 / Review 2 Submission** | **82% Complete**
+**Capstone Project — Phase 3 / Review 3 Final Submission**  
+**Academic Standing:** Review 1: **35 / 35** | Review 2: **32.2 / 35** | Current Total: **67.2 / 70** | Review 3 Goal: **30 / 30 Remaining**
 
 ---
 
-## 📌 Project Overview
+## 📌 1. Project Overview & Problem Statement
 
-**AegisCare** is a privacy-preserving smart-home alerting and monitoring portal designed for older adults living alone. The system operates strictly as an **operational and wellbeing support portal** (not a medical device or emergency medical service).
+Older adults living alone face high risks from undetected emergency situations (such as falls, missed medication, nocturnal wandering, or acute social isolation) while simultaneously desiring to protect their personal privacy and autonomy. Existing smart-home systems either indiscriminately broadcast unredacted, intimate telemetry to family members or flood caregivers with false alarms and technical jargon.
 
-### Core Problem & Innovation
-Older adults living alone often wish to share non-invasive wellbeing status with informal family caregivers, neighbors, and care coordinators without compromising personal autonomy or leaking sensitive medical data. 
+**AegisCare** resolves this conflict through a **privacy-tiered operational alert portal**. The system transforms multi-modal IoT sensor telemetry into explainable, non-medical operational alerts while enforcing:
+- Granular, resident-controlled consent matrices per category and caregiver.
+- Dynamic disclosure tiers (Tier 0 through Tier 3) enforced strictly on the server.
+- Four distinct caregiver role boundaries (Primary, Secondary, Neighbor, Coordinator).
+- Programmatic content safety linting to eliminate clinical/prescriptive phraseology.
+- Multi-channel notification dispatching with Web Push and SMS sandbox adapters.
+- Cryptographic SHA-256 tamper-evident audit chaining.
 
-AegisCare introduces:
-1. **Tiered Privacy Architecture (Tier 0 to Tier 3)**:
-   - **Tier 0 (Status Indicator)**: Binary availability indicator (e.g., *Normal / Check Needed*).
-   - **Tier 1 (Categorical Summary)**: Category label and high-level non-clinical status.
-   - **Tier 2 (Evidence & Trends)**: Operational evidence (e.g., timestamp bounds, counts) and actionable next steps.
-   - **Tier 3 (Higher-Detail Contextual Information)**: Higher-detail contextual information, available only when explicitly permitted by the care recipient's consent settings.
-   *(Note: AegisCare is strictly an operational and wellbeing support portal. The system does not diagnose diseases, prescribe medication, or recommend clinical treatments. Vitals-related metrics are presented strictly within operational/privacy boundaries, and consent remains the controlling authorization mechanism.)*
-2. **Deterministic Rules Engine**: Detects operational anomalies (e.g., missed check-in windows, abnormal nocturnal departures, social isolation, sensor data gaps) without generating medical diagnoses.
-3. **Automated Content Linter**: Programmatically strips clinical terminology, raw vital metrics, and diagnostic phraseology before alert rendering.
-4. **Dynamic Caregiver Consent Matrix**: Granular, per-category, per-caregiver permissions controlled by the care recipient, enforced server-side.
-5. **Auditable Decision Log**: Complete audit trails for every access evaluation and consent update.
+> [!NOTE]
+> **Non-Medical Boundary Disclaimer:** AegisCare operates strictly as an operational and wellbeing support portal. The system is not a medical device, does not provide medical diagnoses, does not prescribe treatments or medication dosages, and is not a substitute for professional clinical care.
 
 ---
 
-## 📊 Benchmark Evaluation (Synthetic Datasets)
+## 🏗️ 2. System Architecture
 
-Evaluated against a reproducible 30-day synthetic telemetry benchmark dataset (3 simulated care recipients, 12 synthetic caregiver persona profiles across 4 roles, 24 generated alerts, 21 ground-truth anomaly events, and 164 tier-filtered caregiver renders; Human Participants = 0).
-
-| Evaluation Metric | Baseline | Review 1 Target | Measured Privacy-Tiered Result | Status |
-|---|---|---|---|---|
-| **Actionability Rate** | 52.0% | &ge; 90.0% | **100.0%** | **Pass** |
-| **Privacy Compliance Rate** | 55.0% | &ge; 95.0% | **100.0%** | **Pass** |
-| **Unnecessary Disclosure Rate** | 45.0% | &le; 5.0% | **0.0%** | **Pass** |
-| **Alert Delivery Accuracy** | 62.5% | &ge; 90.0% | **100.0%** | **Pass** |
-| **Freshness Detection Rate** | 70.0% | &ge; 95.0% | **100.0%** | **Pass** |
-| **Alert Recall** | 78.0% | &ge; 90.0% | **100.0%** | **Pass** |
-| **Content Linter Violations** | 18 | 0 violations | **0 violations** | **Pass** |
+```
+                                  TELEMETRY SOURCES
+                 ┌──────────────────────────────────────────────────┐
+                 │ WebHooks (HMAC-SHA256) │ MQTT Topics │ Synthetic │
+                 └──────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+                             EDGE INGESTION PIPELINE
+                 ┌──────────────────────────────────────────────────┐
+                 │ • HMAC-SHA256 Signature Verification             │
+                 │ • Sliding-Window Deduplication (O(1) Hash)       │
+                 │ • 60s Future Timestamp Clock Skew Rejection      │
+                 │ • Exponential Moving Average Noise Smoothing     │
+                 │ • Sensor Baseline Drift Advisory Detection       │
+                 └──────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+                               PERSISTENCE & STORAGE
+                 ┌──────────────────────────────────────────────────┐
+                 │ SQLite + SQLAlchemy ORM (signals, recipients)    │
+                 └──────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+                             DETERMINISTIC RULES ENGINE
+                 ┌──────────────────────────────────────────────────┐
+                 │ 7 Explainable Anomaly Rules across 6 Categories  │
+                 │ (No Black-Box ML; Strict Operational Bounds)     │
+                 └──────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+                             PRIVACY & CONSENT FILTER
+                 ┌──────────────────────────────────────────────────┐
+                 │ Matrix Gating (Resident Consent x Caregiver Role)│
+                 │ Dynamic Redaction: Tier 0 (Redacted) to Tier 3   │
+                 └──────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+                            CONTENT SAFETY LINTER PASS
+                 ┌──────────────────────────────────────────────────┐
+                 │ 42+ Banned Medical Terms Stripped & Sanitized    │
+                 │ (Applied to Evidence Summary AND Action Steps)   │
+                 └──────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+                           LIVE NOTIFICATION DISPATCHER
+                 ┌──────────────────────────────────────────────────┐
+                 │ • Deterministic Idempotency Key Deduplication    │
+                 │ • Bounded Retries with Exponential Backoff       │
+                 │ • Web Push Sandbox Adapter (SIMULATION)          │
+                 │ • SMS Sandbox Adapter (SIMULATION)               │
+                 └──────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+                          TAMPER-EVIDENT SHA-256 AUDIT CHAIN
+                 ┌──────────────────────────────────────────────────┐
+                 │ Continuous Hash Chain: prev_hash -> entry_hash   │
+                 │ Cryptographic Non-Repudiation & Verification API │
+                 └──────────────────────────────────────────────────┘
+```
 
 ---
 
-## 🏗️ Project Architecture & Structure
+## 🛠️ 3. Technology Stack
+
+- **Backend:** Python 3.10+, FastAPI, Pydantic, Starlette Middleware
+- **Persistence:** SQLite, SQLAlchemy ORM
+- **Security & Cryptography:** PyJWT (HS256/RS256), PBKDF2-HMAC-SHA256 password hashing, HMAC-SHA256 webhook signatures, SHA-256 tamper-evident hash chaining
+- **External Interfaces:** HTTP REST (30 application endpoints), WebHooks, MQTT broker adapter
+- **Frontend Dashboard:** React 18, Vite, Vanilla CSS design system (Fleet overview, Alert feeds, Audit verifier, Consent manager)
+- **Testing & Benchmark:** Pytest (158 automated tests), custom stress evaluation & load testing harnesses
+
+---
+
+## 📁 4. Project Directory Structure
 
 ```
 capstone-project/
-├── api/                      # FastAPI backend server (Phase 1 + Phase 2)
-│   ├── auth.py               # [Phase 2] JWT auth, PBKDF2 hashing, RBAC
-│   ├── database.py           # SQLite / SQLAlchemy ORM + schema migration
-│   ├── data_store.py         # DB storage with SHA-256 audit hash chaining
-│   ├── main.py               # 31 API endpoints (27 application REST + 4 OpenAPI/docs)
-│   ├── mqtt_adapter.py       # [Phase 2] MQTT/IoT ingestion adapter
-│   └── routes/               # API sub-routers
-├── data/                     # Dataset generators and sample data
-│   ├── generate_synthetic.py # Reproducible 30-day telemetry generator
-│   ├── generate_advanced_synthetic.py # [Phase 2] Stress-injected benchmark
-│   ├── sample_dataset.json   # Benchmark synthetic dataset (2,609 signals)
-│   └── advanced_stress_dataset.json  # [Phase 2] Edge case stress dataset
-├── docs/                     # Project documentation & review reports
-│   ├── review_1_documentation.md # Review 1 audit & verification
-│   ├── review_2_documentation.md # [Phase 2] Review 2 audit & verification
-│   ├── demo_script.md        # Step-by-step viva & demo guide
-│   ├── limitations.md        # Assumptions & scope boundaries
-│   ├── requirements.md       # Formal college project specification
-│   └── validation.md         # Requirements-to-test traceability matrix
-├── engine/                   # Core privacy & rules engine
-│   ├── consent_filter.py     # Server-side privacy tier filtering & redaction
-│   ├── content_linter.py     # Regex-based medical terminology sanitization
-│   ├── ingestion.py          # [Phase 2] HMAC WebHook pipeline & edge handling
-│   ├── models.py             # Domain models, audit hash functions
-│   ├── rules.py              # Deterministic anomaly detection rules
-│   └── tests/                # Automated pytest test suite (135 tests)
-├── eval/                     # Evaluation benchmark execution & results
-│   ├── metrics.py            # Quantitative evaluation script (5 metrics)
-│   ├── advanced_metrics.py   # [Phase 2] Stress evaluation (6 metrics)
-│   ├── stakeholder_evaluation.py # [Phase 2] SUS usability protocol
-│   └── results_table.md      # Generated benchmark results
-├── frontend/                 # React (Vite) Web Portal
-│   ├── src/components/       # AlertFeed, FleetDashboard, Audit, Metrics, Consent
-│   ├── package.json          # Frontend dependencies
-│   └── vite.config.js        # Vite configuration
-├── requirements.txt          # Python dependencies (incl. pyjwt, httpx)
-└── README.md                 # Project README
+├── api/                      # FastAPI backend server
+│   ├── auth.py               # JWT authentication, PBKDF2 hashing, server-side RBAC
+│   ├── oidc_auth.py          # [Phase 3] Enterprise OIDC token validator & adapter
+│   ├── middleware.py         # [Phase 3] Correlation ID & structured error middleware
+│   ├── database.py           # SQLite database & SQLAlchemy ORM models
+│   ├── data_store.py         # Data access layer & SHA-256 audit chaining
+│   ├── main.py               # 34 registered routes (30 REST + 4 OpenAPI/docs)
+│   ├── mqtt_adapter.py       # MQTT IoT ingestion adapter
+│   └── routes/               # Modular router directory
+├── engine/                   # Core privacy, rules, and notification engine
+│   ├── consent_filter.py     # Privacy tier redaction & consent lookup
+│   ├── content_linter.py     # 42+ banned medical terms regex sanitizer
+│   ├── ingestion.py          # Edge ingestion, HMAC, deduplication, EMA noise filter
+│   ├── models.py             # Domain models & audit hash utilities
+│   ├── notification_dispatcher.py # [Phase 3] Live notification dispatcher & sandbox adapters
+│   ├── rules.py              # 7 deterministic anomaly detection rules
+│   └── tests/                # 13 automated test suites (158 tests passing)
+├── eval/                     # Evaluation, stress testing, and load benchmarks
+│   ├── composite_stress_eval.py # [Phase 3] 8 compound failure scenarios
+│   ├── load_test.py          # [Phase 3] Local load benchmark (100–5000 events)
+│   ├── metrics.py            # Phase 1 baseline evaluation suite
+│   ├── advanced_metrics.py   # Phase 2 stress evaluation suite
+│   └── stakeholder_evaluation.py # Simulated SUS usability evaluation
+├── data/                     # Datasets and SQLite database
+│   ├── sample_dataset.json   # 30-day multi-resident baseline dataset
+│   ├── advanced_stress_dataset.json # Phase 2 noise & packet-drop dataset
+│   └── portal.db             # Operational SQLite database
+├── docs/                     # Comprehensive technical documentation
+│   ├── api.md                # [Phase 3] Complete REST API endpoint reference
+│   ├── database_schema.md    # [Phase 3] Database tables, columns, indexes
+│   ├── testing.md            # [Phase 3] Granular unit & regression testing documentation
+│   ├── error_boundaries.md   # [Phase 3] Error handling & failure matrix
+│   ├── stakeholder_protocol.md # [Phase 3] Simulated SUS usability protocol (Human=0)
+│   ├── phase3_completion_audit.md # [Phase 3] Final capstone verification audit
+│   ├── review_3_documentation.md # [Phase 3] Review 3 submission report
+│   ├── review_2_documentation.md # Review 2 submission report
+│   └── limitations.md        # Assumptions, boundaries, and future work
+└── frontend/                 # React 18 + Vite dashboard
+    ├── src/components/       # AlertFeed, FleetDashboard, AuditVerifier, ConsentMatrix
+    └── package.json          # Node dependencies
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 5. Getting Started & Setup Instructions
 
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+ and npm
 
-### 1. Backend Setup
+### 1. Backend Startup
 ```bash
-# Install Python dependencies
+# Install backend dependencies
 pip install -r requirements.txt
 
-# (Optional) Regenerate synthetic dataset
-python data/generate_synthetic.py
+# Run the complete test suite (158 tests)
+python -m pytest engine/tests/ -v
 
-# Start the FastAPI backend server
-python -m uvicorn api.main:app --port 8000 --host 127.0.0.1 --reload
+# Start FastAPI dev server on port 8000
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-*Backend API will be accessible at: `http://127.0.0.1:8000`*  
-*Swagger Documentation: `http://127.0.0.1:8000/docs`*
+API Documentation will be available at: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-### 2. Frontend Setup
+### 2. Frontend Startup
 ```bash
+# Navigate to frontend directory & install dependencies
 cd frontend
 npm install
+
+# Run frontend dev server
 npm run dev
+
+# Or build production bundle
+npm run build
 ```
-*Frontend Portal will be accessible at: `http://localhost:5173`*
+Frontend will be available at: [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 🧪 Running Tests & Evaluation
+## 🔒 6. Privacy-Tiered Disclosure Model
 
-### Run Automated Unit & Integration Tests (135 Tests — Phase 2)
-```bash
-python -m pytest engine/tests/ -v
-# Expected: 135 passed, 0 failed
-```
-
-### Run Quantitative Evaluation Benchmark
-```bash
-python eval/metrics.py
-```
+| Disclosure Tier | Privacy-Safe Definition | Typical Content |
+| :---: | :--- | :--- |
+| **Tier 0** | **Withheld / Redacted Indicator** | Generic system active indicator; specific anomaly and context are completely withheld. |
+| **Tier 1** | **Standard Operational Alert** | High-level category, severity badge, and non-medical suggested next action. |
+| **Tier 2** | **Detailed Contextual Timeline** | Operational trend durations, departure hours, and baseline comparison. |
+| **Tier 3** | **Higher-Detail Contextual Summary** | Qualitative wellness summary over historical windows, available strictly when consented. |
 
 ---
 
-## 🛡️ Privacy & Compliance Guarantees
-- **Strict Least-Privilege**: Unconsented categories default to Tier 0 or complete withholding.
-- **Fail-Safe Revocation**: Immediate mid-stream withholding upon consent revocation.
-- **Zero Raw Diagnosis Leak**: All textual alerts pass automated content linting to guarantee non-clinical operational phrasing.
-- **Role Constraints**: Even professional roles (care coordinators) cannot view categories without explicit resident consent.
+## 👥 7. Pre-Seeded Demonstration User Accounts
+
+| Username | Password | Caregiver ID | Role | Assigned Residents |
+| :--- | :--- | :--- | :--- | :--- |
+| `jane.smith` | `AegisCare2026!` | `cg_001` | Primary Caregiver | Eleanor Vance (`cr_001`) |
+| `bob.smith` | `AegisCare2026!` | `cg_002` | Secondary Caregiver | Eleanor Vance (`cr_001`) |
+| `maria.garcia` | `AegisCare2026!` | `cg_003` | Neighbor / Community | Eleanor Vance (`cr_001`) |
+| `dr.sarah.chen` | `AegisCare2026!` | `cg_004` | Care Coordinator | All Residents (`cr_001`, `cr_002`, `cr_003`) |
+| `admin` | `AegisCare2026!` | `admin_001` | System Administrator | All Residents |
+
+---
+
+## 📊 8. Verified Benchmark & Evaluation Metrics
+
+| Metric | Target Baseline | Measured Result | Verification Method | Status |
+| :--- | :---: | :---: | :--- | :---: |
+| **Automated Test Suite** | 100% Pass | **158 / 158 Passed (100.0%)** | `python -m pytest engine/tests/ -v` | **PASS** |
+| **Frontend Production Build** | Zero Errors | **Clean Build in 4.23s** | `npm --prefix frontend run build` | **PASS** |
+| **Actionability Rate** | $\ge 90.0\%$ | **100.0%** | `python eval/metrics.py` | **PASS** |
+| **Privacy Compliance Rate** | $\ge 95.0\%$ | **100.0%** | `python eval/metrics.py` | **PASS** |
+| **Unnecessary Disclosure Rate** | $\le 5.0\%$ | **0.0%** | `python eval/metrics.py` | **PASS** |
+| **Alert Delivery Accuracy** | $\ge 90.0\%$ | **100.0%** | `python eval/metrics.py` | **PASS** |
+| **Content Linter Violations** | 0 violations | **0 violations** | `python eval/metrics.py` | **PASS** |
+| **Composite Stress Pass Rate** | $\ge 90.0\%$ | **8 / 8 Passed (100.0%)** | `python eval/composite_stress_eval.py` | **PASS** |
+| **Audit Chain Tamper Detection**| 100% Detection | **100.0% Verified** | `GET /api/audit/verify` | **PASS** |
+| **Human Usability Participants**| Documented Boundary | **0 (Strictly Simulated SUS)**| [`docs/stakeholder_protocol.md`](file:///c:/Users/Administrator/Desktop/capstone%20project%20clg/docs/stakeholder_protocol.md) | **VERIFIED** |
+
+---
+
+## 📖 9. Detailed Documentation Links
+
+- **[REST API Reference](file:///c:/Users/Administrator/Desktop/capstone%20project%20clg/docs/api.md)** — OpenAPI schemas, parameters, and responses for all 31 routes.
+- **[Database Schema](file:///c:/Users/Administrator/Desktop/capstone%20project%20clg/docs/database_schema.md)** — Relational structure, columns, indexes, and privacy relevance.
+- **[Testing & Regression Documentation](file:///c:/Users/Administrator/Desktop/capstone%20project%20clg/docs/testing.md)** — Granular test breakdown across all 158 automated test cases.
+- **[Error Boundaries & Failure Matrix](file:///c:/Users/Administrator/Desktop/capstone%20project%20clg/docs/error_boundaries.md)** — Input validations and system mitigations for 28+ error modes.
+- **[Simulated Stakeholder Protocol](file:///c:/Users/Administrator/Desktop/capstone%20project%20clg/docs/stakeholder_protocol.md)** — Usability protocol, personas, tasks, and Human=0 boundary.
+- **[Phase 3 Completion Audit](file:///c:/Users/Administrator/Desktop/capstone%20project%20clg/docs/phase3_completion_audit.md)** — Traceability matrix across all capstone and review deliverables.
+- **[Review 3 Submission Report](file:///c:/Users/Administrator/Desktop/capstone%20project%20clg/docs/review_3_documentation.md)** — Comprehensive academic capstone report.

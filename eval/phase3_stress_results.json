@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-09-29T10:48:19.417655",
+  "total_scenarios": 8,
+  "scenarios_passed": 8,
+  "scenarios_failed": 0,
+  "pass_rate_pct": 100.0,
+  "results": [
+    {
+      "scenario_id": "SCENARIO-1",
+      "name": "Duplicate + Delayed Event",
+      "input_conditions": "Event delayed 15 minutes past nominal transmission followed by immediate retransmission.",
+      "expected_behavior": "First delayed event ingested; duplicate retransmission detected and ignored.",
+      "actual_behavior": "Initial ingest: ingested; Secondary: duplicate_ignored (duplicate=True).",
+      "status": "PASS",
+      "privacy_safety_guarantee": "Prevents double-alert generation and counter inflation."
+    },
+    {
+      "scenario_id": "SCENARIO-2",
+      "name": "Out-of-Order + Stale Telemetry",
+      "input_conditions": "Newer telemetry arrives first; older packet arrives out-of-order.",
+      "expected_behavior": "Both ingested safely without time sequence corruption or database crash.",
+      "actual_behavior": "Both signals ingested; timestamps preserved for historical sequence sorting.",
+      "status": "PASS",
+      "privacy_safety_guarantee": "Historical timeline consistency maintained across out-of-order deliveries."
+    },
+    {
+      "scenario_id": "SCENARIO-3",
+      "name": "Missing Required Field + Malformed Payload",
+      "input_conditions": "Payload with missing recipient identifier followed by unsupported signal type.",
+      "expected_behavior": "Both payloads rejected at ingestion boundary with safe validation errors.",
+      "actual_behavior": "Payload 1 errors: [\"Missing required field: 'care_recipient_id' (or 'recipient_id'/'patient_id')\"]; Payload 2 status: rejected_invalid_payload.",
+      "status": "PASS",
+      "privacy_safety_guarantee": "Malformed edge data never propagates to rules engine or caregiver views."
+    },
+    {
+      "scenario_id": "SCENARIO-4",
+      "name": "Sensor Drift + High-Frequency Noise",
+      "input_conditions": "Single-sample spike (+40 units) followed by persistent baseline shift (>15%).",
+      "expected_behavior": "Spike smoothed by EMA filter; persistent baseline divergence flags drift advisory.",
+      "actual_behavior": "Noise spike smoothed to 64.0; Drift detected: True.",
+      "status": "PASS",
+      "privacy_safety_guarantee": "Transient hardware noise does not trigger false caregiver panic."
+    },
+    {
+      "scenario_id": "SCENARIO-5",
+      "name": "Network Interruption + Packet Burst (Data Storm)",
+      "input_conditions": "100 telemetry packets delivered in a single rapid burst.",
+      "expected_behavior": "All 100 packets normalized, deduplicated, and processed without dropping data.",
+      "actual_behavior": "Processed 100/100 events in 7.3ms.",
+      "status": "PASS",
+      "privacy_safety_guarantee": "System remains responsive under packet backlog recovery."
+    },
+    {
+      "scenario_id": "SCENARIO-6",
+      "name": "Multiple Simultaneous Anomalies",
+      "input_conditions": "Simultaneous missed check-in and device heartbeat gap.",
+      "expected_behavior": "Generates distinct, explainable operational alerts; does NOT combine into synthetic diagnosis.",
+      "actual_behavior": "Generated 6 distinct alerts; all strictly passed non-medical linter.",
+      "status": "PASS",
+      "privacy_safety_guarantee": "Preserves strict non-medical boundary under compound event conditions."
+    },
+    {
+      "scenario_id": "SCENARIO-7",
+      "name": "Consent Restriction + Alert Generation",
+      "input_conditions": "High-severity medication alert dispatched to Neighbor caregiver with Tier 0 (withheld) consent.",
+      "expected_behavior": "Notification dispatch withheld at dispatcher boundary; 0 private data transmitted.",
+      "actual_behavior": "Status: withheld_consent; Disclosed tier: 0.",
+      "status": "PASS",
+      "privacy_safety_guarantee": "Backend consent boundary strictly enforced before external notification dispatch."
+    },
+    {
+      "scenario_id": "SCENARIO-8",
+      "name": "Sensor Data Gap + Subsequent Recovery",
+      "input_conditions": "8-hour missing heartbeat generates system alert; fresh heartbeat arrives 5 minutes ago.",
+      "expected_behavior": "Data gap correctly fired as system status, then automatically cleared upon telemetry arrival.",
+      "actual_behavior": "Gap fired: True; Recovery cleared alert: True.",
+      "status": "PASS",
+      "privacy_safety_guarantee": "System alerts distinguish operational hardware status from resident wellbeing."
+    }
+  ]
+}

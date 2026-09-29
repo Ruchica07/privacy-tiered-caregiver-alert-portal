@@ -1,0 +1,54 @@
+{
+  "benchmark_timestamp": "2026-09-29T10:31:31.861639Z",
+  "disclaimer": "Synthetic local benchmark; not production capacity validation.",
+  "hardware_environment": {
+    "platform": "win32",
+    "python_version": "3.12.10"
+  },
+  "volume_tiers": [
+    {
+      "num_events": 100,
+      "total_duration_sec": 0.0132,
+      "throughput_events_per_sec": 7596.65,
+      "avg_latency_ms": 0.1143,
+      "p95_latency_ms": 0.1719,
+      "success_count": 100,
+      "duplicate_count": 0,
+      "failure_count": 0,
+      "memory_delta_mb": 0.0
+    },
+    {
+      "num_events": 500,
+      "total_duration_sec": 0.1935,
+      "throughput_events_per_sec": 2583.33,
+      "avg_latency_ms": 0.3582,
+      "p95_latency_ms": 0.7938,
+      "success_count": 500,
+      "duplicate_count": 0,
+      "failure_count": 0,
+      "memory_delta_mb": 0.0
+    },
+    {
+      "num_events": 1000,
+      "total_duration_sec": 0.797,
+      "throughput_events_per_sec": 1254.65,
+      "avg_latency_ms": 0.7528,
+      "p95_latency_ms": 1.6153,
+      "success_count": 1000,
+      "duplicate_count": 0,
+      "failure_count": 0,
+      "memory_delta_mb": 0.0
+    },
+    {
+      "num_events": 5000,
+      "total_duration_sec": 14.2658,
+      "throughput_events_per_sec": 350.49,
+      "avg_latency_ms": 2.7977,
+      "p95_latency_ms": 6.497,
+      "success_count": 5000,
+      "duplicate_count": 0,
+      "failure_count": 0,
+      "memory_delta_mb": 0.0
+    }
+  ]
+}

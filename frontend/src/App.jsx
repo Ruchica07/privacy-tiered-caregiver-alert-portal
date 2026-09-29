@@ -306,6 +306,7 @@ export default function App() {
                 alerts={alerts}
                 accessSummary={accessSummary}
                 caregiverRole={currentCaregiver.role}
+                caregiverId={selectedCaregiverId}
                 onRefresh={handleRefreshRules}
                 loading={loading}
               />

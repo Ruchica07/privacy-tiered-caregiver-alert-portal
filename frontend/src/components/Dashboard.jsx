@@ -8,6 +8,7 @@ export default function Dashboard({
   alerts = [],
   accessSummary = [],
   caregiverRole = '',
+  caregiverId = '',
   onRefresh,
   loading = false
 }) {
@@ -177,7 +178,7 @@ export default function Dashboard({
                 />
                 {isExp && alert.rendered_tier > 0 && (
                   <div style={{ marginTop: '-0.5rem', marginBottom: '1.25rem', paddingLeft: '1rem', borderLeft: '2px dashed rgba(99,102,241,0.4)' }}>
-                    <AlertDrilldown alert={alert} />
+                    <AlertDrilldown alert={alert} caregiverId={caregiverId} />
                   </div>
                 )}
               </div>

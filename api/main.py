@@ -32,21 +32,28 @@ from engine.consent_filter import (
 from engine.content_linter import lint_text, sanitize_alert_text
 from engine.models import generate_id, FreshnessState, SignalType, InformationCategory
 from engine.ingestion import get_ingestion_pipeline, IngestionResult
+from engine.notification_dispatcher import get_notification_dispatcher, DeliveryChannel, DeliveryStatus
 from api.mqtt_adapter import get_mqtt_adapter, MQTTMessage
 from api.auth import (
     LoginRequest, TokenResponse, get_current_user, require_auth,
     verify_password, create_access_token, SEED_USERS, ACCESS_TOKEN_EXPIRE_MINUTES,
     verify_caregiver_access
 )
+from api.oidc_auth import validate_oidc_token, OIDCValidationResult
+from api.middleware import CorrelationIdMiddleware, register_exception_handlers
 
 app = FastAPI(
     title="AegisCare: Privacy-Tiered Caregiver Alert Portal API",
     description=(
         "Production-grade operational & wellbeing support API for older adults living alone. "
-        "Implements cryptographic audit verification, edge deduplication, HMAC webhooks, and JWT RBAC."
+        "Implements cryptographic audit verification, edge deduplication, HMAC webhooks, JWT/OIDC RBAC, "
+        "and privacy-tiered notification dispatching."
     ),
-    version="0.2.0",
+    version="0.3.0",
 )
+
+# Structured Observability & Correlation ID Middleware (Phase 3)
+app.add_middleware(CorrelationIdMiddleware)
 
 # CORS for frontend dev server
 app.add_middleware(
@@ -56,6 +63,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global Standardized Error Envelopes
+register_exception_handlers(app)
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +112,17 @@ class ConsentUpdateRequest(BaseModel):
 
 class RunRulesRequest(BaseModel):
     evaluation_time: Optional[str] = None
+
+
+class OIDCValidateRequest(BaseModel):
+    token: str
+
+
+class NotificationDispatchRequest(BaseModel):
+    alert_id: str
+    caregiver_id: str
+    channel: str = "web_push"
+    recipient_contact: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +182,27 @@ def login(request: LoginRequest):
 def get_current_user_profile(current_user: dict = Depends(require_auth)):
     """Retrieve profile and RBAC permissions of the authenticated user."""
     return {"user": current_user}
+
+
+@app.post("/api/auth/oidc/validate")
+def validate_oidc(request: OIDCValidateRequest):
+    """
+    Enterprise-ready OIDC Bearer token validation endpoint.
+    Validates token signature, issuer, audience, expiration, and claims mapping.
+    """
+    result = validate_oidc_token(request.token)
+    if not result.is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=result.error_message or "OIDC token validation failed.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return {
+        "is_valid": True,
+        "status": result.status,
+        "caregiver_profile": result.caregiver_profile,
+        "claims": result.claims.dict() if result.claims else None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -630,16 +672,8 @@ def get_data_status(care_recipient_id: str):
 # Tamper-Evident Audit & Verification Endpoints (Phase 2)
 # ---------------------------------------------------------------------------
 
-@app.get("/api/audit/{care_recipient_id}")
-def get_audit_log(care_recipient_id: str):
-    """Get the audit trail for a care recipient."""
-    store = get_store()
-    log = store.get_audit_log(care_recipient_id)
-    return {"audit_log": log, "total": len(log)}
-
-
-@app.get("/api/audit-verify")
 @app.get("/api/audit/verify")
+@app.get("/api/audit-verify")
 def verify_audit_trail(care_recipient_id: Optional[str] = Query(None)):
     """
     Cryptographically verify the SHA-256 hash chain of the audit trail.
@@ -648,6 +682,14 @@ def verify_audit_trail(care_recipient_id: Optional[str] = Query(None)):
     store = get_store()
     result = store.verify_audit_chain(care_recipient_id)
     return result
+
+
+@app.get("/api/audit/{care_recipient_id}")
+def get_audit_log(care_recipient_id: str):
+    """Get the audit trail for a care recipient."""
+    store = get_store()
+    log = store.get_audit_log(care_recipient_id)
+    return {"audit_log": log, "total": len(log)}
 
 
 @app.get("/api/audit/{care_recipient_id}/verify")
@@ -715,3 +757,76 @@ def lint_check(text: str = Query(...)):
         "violations": [v.to_dict() for v in violations],
         "sanitized": sanitized,
     }
+
+
+# ---------------------------------------------------------------------------
+# Notification Dispatcher Endpoints (Phase 3)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/notifications/dispatch")
+def dispatch_notification(
+    request: NotificationDispatchRequest,
+    current_user: Optional[dict] = Depends(get_current_user),
+):
+    """
+    Dispatches a privacy-filtered alert notification to a caregiver.
+    Applies role-based consent filtering, content linting, idempotency deduplication,
+    and records a tamper-evident audit log.
+    """
+    # Enforce RBAC
+    verify_caregiver_access(request.caregiver_id, current_user=current_user)
+
+    store = get_store()
+    caregiver = store.get_caregiver(request.caregiver_id)
+    if not caregiver:
+        raise HTTPException(status_code=404, detail="Caregiver not found")
+
+    # Locate the target alert
+    target_alert = None
+    target_recipient_id = None
+    for r_id in caregiver.get("care_recipient_ids", []):
+        alerts = store.get_alerts(r_id)
+        for a in alerts:
+            if a.get("alert_id") == request.alert_id:
+                target_alert = a
+                target_recipient_id = r_id
+                break
+        if target_alert:
+            break
+
+    if not target_alert:
+        raise HTTPException(status_code=404, detail="Alert not found for this caregiver's assigned care recipients")
+
+    consent_matrix = store.get_consent_matrix(target_recipient_id)
+    dispatcher = get_notification_dispatcher()
+
+    recipient_contact = request.recipient_contact or f"{request.caregiver_id}@notifications.local"
+    try:
+        channel_enum = DeliveryChannel(request.channel)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid delivery channel '{request.channel}'. Supported: 'web_push', 'sms'."
+        )
+
+    result = dispatcher.dispatch_alert(
+        raw_alert=target_alert,
+        caregiver=caregiver,
+        consent_matrix=consent_matrix,
+        channel=channel_enum,
+        recipient_contact=recipient_contact,
+        audit_sink=store,
+    )
+
+    return result
+
+
+@app.get("/api/notifications/history")
+def get_notification_history(
+    care_recipient_id: Optional[str] = Query(None),
+    current_user: Optional[dict] = Depends(get_current_user),
+):
+    """Retrieve recorded notification dispatches and sandbox delivery states."""
+    dispatcher = get_notification_dispatcher()
+    history = dispatcher.get_dispatch_history(care_recipient_id=care_recipient_id)
+    return {"notifications": history, "total": len(history)}

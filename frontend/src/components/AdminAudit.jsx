@@ -178,6 +178,9 @@ export default function AdminAudit({ auditLogs = [] }) {
           <option value="alert_filtered">Alert Filtering Decisions</option>
           <option value="webhook_ingest">Edge WebHook Ingestion</option>
           <option value="rules_executed">Rules Execution</option>
+          <option value="notification_dispatched">Notification Dispatched</option>
+          <option value="notification_withheld_consent">Notification Withheld (Consent)</option>
+          <option value="notification_failed">Notification Failed</option>
           <option value="user_login">Authenticated Logins</option>
         </select>
       </div>
